@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<title>Chat Archiver 設定</title>
+<style>
+  :root { color-scheme: light dark; --b: #8884; }
+  body { font: 14px/1.6 system-ui, -apple-system, "Hiragino Sans", sans-serif; max-width: 640px; margin: 32px auto; padding: 0 16px; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  h2 { font-size: 15px; margin: 28px 0 8px; border-bottom: 1px solid var(--b); padding-bottom: 4px; }
+  label { display: block; margin: 10px 0 2px; font-weight: 600; }
+  .hint { font-size: 12px; opacity: .7; font-weight: normal; }
+  input[type=text], input[type=password], input[type=number] { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--b); border-radius: 6px; font: inherit; }
+  .row { display: flex; gap: 12px; } .row > div { flex: 1; }
+  .check { font-weight: normal; display: flex; gap: 8px; align-items: center; }
+  button { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--b); background: transparent; font: inherit; cursor: pointer; margin: 4px 6px 4px 0; }
+  button.primary { background: #2f6feb; color: #fff; border-color: #2f6feb; }
+  pre { background: #8881; padding: 10px; border-radius: 6px; white-space: pre-wrap; font-size: 12px; }
+  #msg { min-height: 1.6em; }
+</style>
+</head>
+<body>
+  <h1>Chat Archiver</h1>
+  <div class="hint">ChatGPT / Claude の会話を GitHub リポジトリに自動コミットします。</div>
+
+  <h2>GitHub</h2>
+  <label>Personal Access Token <span class="hint">（Fine-grained・対象リポジトリのみ・Contents: Read and write）</span></label>
+  <input id="token" type="password" autocomplete="off" placeholder="github_pat_..." />
+  <div class="row">
+    <div><label>オーナー</label><input id="owner" type="text" placeholder="your-name" /></div>
+    <div><label>リポジトリ</label><input id="repo" type="text" placeholder="chat-archive" /></div>
+  </div>
+  <div class="row">
+    <div><label>ブランチ</label><input id="branch" type="text" /></div>
+    <div><label>保存先フォルダ <span class="hint">（空ならルート）</span></label><input id="basePath" type="text" placeholder="" /></div>
+  </div>
+
+  <h2>同期</h2>
+  <label class="check"><input id="enableChatgpt" type="checkbox" /> ChatGPT を保存する</label>
+  <label class="check"><input id="enableClaude" type="checkbox" /> Claude（claude.ai）を保存する</label>
+  <label class="check"><input id="enableGrok" type="checkbox" /> Grok（grok.com）を保存する</label>
+  <label class="check"><input id="commitEachTurn" type="checkbox" /> 返信が終わるたびにコミットする</label>
+  <label class="check"><input id="saveRaw" type="checkbox" /> 元のJSONも保存する（_raw/ フォルダ）</label>
+  <label>巡回間隔（分） <span class="hint">スマホアプリ等で話した分もここで拾います。0で無効</span></label>
+  <input id="intervalMin" type="number" min="0" step="1" style="width:120px" />
+
+  <p>
+    <button class="primary" id="save">保存</button>
+    <button id="test">接続テスト</button>
+    <button id="sweep">今すぐ同期</button>
+    <button id="full">全件を再チェック</button>
+  </p>
+  <div id="msg"></div>
+
+  <h2>状態</h2>
+  <pre id="status">-</pre>
+  <button id="reset">同期履歴をリセット</button>
+  <span class="hint">（次回、全会話を取り込み直します。GitHub 上のファイルは消えません）</span>
+
+  <script src="options.js"></script>
+</body>
+</html>

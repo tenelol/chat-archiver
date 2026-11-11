@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CHAT_ARCHIVE_REPO=\"$HOME/chat-archive\" python3 \"$HOME/chat-archiver/claude-code-hook/archive_claude_code.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
