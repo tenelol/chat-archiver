@@ -17,6 +17,19 @@ ChatGPT・Claude・Grok の会話履歴を Markdown にして、自分の GitHub
 > - 各サービスの利用規約には、自動化された手段でのデータ取得を制限する条項があります。使う前に規約を確認し、自己責任で使ってください。
 > - 公式に用意された方法としては、各サービスの「データをエクスポート」があります。
 
+## 使う前に必要なもの
+
+| 必要なもの | 説明 |
+|---|---|
+| ブラウザ | Chrome 系（Chrome・Edge・Arc・Dia など）か Firefox 140 以降 |
+| GitHub アカウント | 無料で作れます |
+| 保存先の **Private** リポジトリ | 会話を保存する場所。自分で1つ作ります（[手順1](#1-保存先リポジトリを作る)） |
+| **GitHub のトークン** | 拡張があなたのリポジトリに書き込むための「鍵」です（[手順2](#2-github-のトークンを発行する)） |
+| 各サービスへのログイン | ChatGPT・Claude・Grok に、そのブラウザでログインしておく |
+
+> [!IMPORTANT]
+> **GitHub のトークンがないと動きません。** 拡張は会話を GitHub に保存するとき、あなたの代わりにリポジトリへ書き込みます。そのための許可証がトークンです。パスワードの代わりになる大事なものなので、他人に渡したりチャットに貼ったりしないでください。
+
 ## 仕組み
 
 ```
@@ -56,15 +69,30 @@ GitHub で **Private** リポジトリを作ります（例：`chat-archive`）�
 
 > 会話には個人的な内容が入るので、**Public にはしないでください**。
 
-### 2. トークンを発行する
+### 2. GitHub のトークンを発行する
 
-GitHub → Settings → Developer settings → **Fine-grained personal access tokens** → Generate new token
+拡張がリポジトリに書き込むための「鍵」を作ります。**手順1で作ったリポジトリにだけ、ファイルの読み書きができる鍵** にするのがポイントです。
 
-- Repository access：**Only select repositories** → 1 で作ったリポジトリだけ
-- Permissions → Repository permissions → **Contents：Read and write**
-- 有効期限はお好みで（切れたら発行し直して設定画面に貼り直す）
+1. GitHub にログインした状態で [Fine-grained personal access tokens の発行ページ](https://github.com/settings/personal-access-tokens/new) を開く
+   （画面からたどる場合：右上のアイコン → Settings → 左下の Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token）
+2. 次のように入力する
 
-トークンはブラウザの拡張用ストレージに暗号化されずに保存されます。必ず対象リポジトリと権限を絞ってください。
+   | 項目 | 設定 |
+   |---|---|
+   | Token name | 何でもよい（例：`chat-archiver`） |
+   | Expiration | 有効期限。お好みで（例：1年）。切れたら作り直す |
+   | Repository access | **Only select repositories** を選び、手順1のリポジトリ **だけ** を選ぶ |
+   | Permissions | Repository permissions の **Contents** を **Read and write** にする（Metadata: Read-only は自動で付く） |
+
+3. 一番下の **Generate token** を押す
+4. 表示された `github_pat_...` で始まる文字列をコピーする（**この画面を離れると二度と表示されません**）
+5. すぐに拡張の設定画面（[手順4](#4-設定する)）の「Personal Access Token」欄に貼り付ける
+
+> [!CAUTION]
+> - **All repositories（全リポジトリ）や Classic token は使わないでください。** 漏れたときに、ほかのリポジトリまで書き換えられてしまいます。
+> - トークンは他人に渡さない・チャットやスクリーンショットに載せないでください。載せてしまったら、同じページの **Regenerate token** で作り直し、設定画面に貼り直します。
+> - トークンはブラウザの拡張用ストレージに暗号化されずに保存されます。共用の PC では使わないでください。
+> - 期限が切れると設定画面の状態欄に `GitHub 401` と出ます。作り直して貼り直せば元どおり動きます。
 
 ### 3. 拡張を入れる
 
