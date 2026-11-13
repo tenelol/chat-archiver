@@ -12,6 +12,7 @@
   .hint { font-size: 12px; opacity: .7; font-weight: normal; }
   input[type=text], input[type=password], input[type=number] { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 1px solid var(--b); border-radius: 6px; font: inherit; }
   .row { display: flex; gap: 12px; } .row > div { flex: 1; }
+  .token-row { display: flex; gap: 8px; align-items: center; } .token-row input { flex: 1; } .token-row button { margin: 0; white-space: nowrap; }
   .check { font-weight: normal; display: flex; gap: 8px; align-items: center; }
   button { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--b); background: transparent; font: inherit; cursor: pointer; margin: 4px 6px 4px 0; }
   button.primary { background: #2f6feb; color: #fff; border-color: #2f6feb; }
@@ -25,7 +26,11 @@
 
   <h2>GitHub</h2>
   <label>Personal Access Token <span class="hint">（Fine-grained・対象リポジトリのみ・Contents: Read and write）</span></label>
-  <input id="token" type="password" autocomplete="off" placeholder="github_pat_..." />
+  <div class="token-row">
+    <input id="token" type="password" autocomplete="off" placeholder="github_pat_..." />
+    <button id="pasteToken" type="button">貼り付け</button>
+  </div>
+  <div class="hint">⌘V / Ctrl+V で貼れないブラウザでは「貼り付け」ボタンを使ってください（初回だけクリップボードの読み取りを許可します）</div>
   <div class="row">
     <div><label>オーナー</label><input id="owner" type="text" placeholder="your-name" /></div>
     <div><label>リポジトリ</label><input id="repo" type="text" placeholder="chat-archive" /></div>

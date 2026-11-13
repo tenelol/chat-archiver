@@ -44,6 +44,21 @@ async function renderStatus() {
     .join('\n');
 }
 
+// ブラウザによってはパスワード欄にキーボードで貼り付けられない(Phi など)ので、
+// ボタンからクリップボードを読んで入れる。権限は押したときにだけ求める(optional_permissions)
+$('pasteToken').onclick = async () => {
+  try {
+    const granted = await chrome.permissions.request({ permissions: ['clipboardRead'] });
+    if (!granted) return msg('クリップボードの読み取りが許可されませんでした');
+    const text = (await navigator.clipboard.readText()).trim();
+    if (!text) return msg('クリップボードが空です');
+    $('token').value = text;
+    msg(/^(github_pat_|ghp_)/.test(text) ? 'トークンを貼り付けました。「保存」を押してください' : '⚠️ トークンらしくない文字列です。コピーした内容を確認してください');
+  } catch (e) {
+    msg(`❌ 貼り付けできませんでした: ${e.message}`);
+  }
+};
+
 $('save').onclick = async () => {
   await chrome.storage.local.set({ config: read() });
   msg('保存しました');
