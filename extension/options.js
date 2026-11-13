@@ -46,11 +46,47 @@ async function renderStatus() {
 
 // ブラウザによってはパスワード欄にキーボードで貼り付けられない(Phi など)ので、
 // ボタンからクリップボードを読んで入れる。権限は押したときにだけ求める(optional_permissions)
+// 権限の確認ダイアログが出るとページからフォーカスが外れ、readText が "Document is not focused" で失敗する。
+// フォーカスが戻るのを少し待ってから読む
+function waitForFocus(ms = 3000) {
+  if (document.hasFocus()) return Promise.resolve();
+  window.focus();
+  return new Promise((resolve) => {
+    window.addEventListener('focus', resolve, { once: true });
+    setTimeout(resolve, ms);
+  });
+}
+
+// readText が使えない場合は、隠したテキスト欄に execCommand('paste') で貼って取り出す(clipboardRead 権限で動く)
+function pasteViaExecCommand() {
+  const ta = document.createElement('textarea');
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  const ok = document.execCommand('paste');
+  const text = ta.value;
+  ta.remove();
+  $('token').focus();
+  if (!ok) throw new Error('このブラウザではクリップボードを読めませんでした');
+  return text;
+}
+
+async function readClipboard() {
+  try {
+    await waitForFocus();
+    return await navigator.clipboard.readText();
+  } catch {
+    return pasteViaExecCommand();
+  }
+}
+
 $('pasteToken').onclick = async () => {
   try {
-    const granted = await chrome.permissions.request({ permissions: ['clipboardRead'] });
+    const has = await chrome.permissions.contains({ permissions: ['clipboardRead'] });
+    const granted = has || (await chrome.permissions.request({ permissions: ['clipboardRead'] }));
     if (!granted) return msg('クリップボードの読み取りが許可されませんでした');
-    const text = (await navigator.clipboard.readText()).trim();
+    const text = (await readClipboard()).trim();
     if (!text) return msg('クリップボードが空です');
     $('token').value = text;
     msg(/^(github_pat_|ghp_)/.test(text) ? 'トークンを貼り付けました。「保存」を押してください' : '⚠️ トークンらしくない文字列です。コピーした内容を確認してください');
