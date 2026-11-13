@@ -132,4 +132,20 @@ $('reset').onclick = async () => {
 chrome.storage.onChanged.addListener((ch) => {
   if (ch.status || ch.convs || ch.retry) renderStatus();
 });
+// 伏せ字の CSS が使えるブラウザ(Chromium 系・Safari)では、トークン欄を普通の入力欄にする。
+// パスワード欄のままだと、ブラウザによってコピー・貼り付け・取り消しのショートカットが効かない。
+// 使えないブラウザ(古い Firefox など)ではパスワード欄のまま残す。
+const useMask = CSS.supports('-webkit-text-security', 'disc');
+if (useMask) {
+  $('token').type = 'text';
+  $('token').classList.add('masked');
+}
+$('toggleToken').onclick = () => {
+  const el = $('token');
+  const hidden = useMask ? el.classList.contains('masked') : el.type === 'password';
+  if (useMask) el.classList.toggle('masked', !hidden);
+  else el.type = hidden ? 'text' : 'password';
+  $('toggleToken').textContent = hidden ? '隠す' : '表示';
+};
+
 load();
