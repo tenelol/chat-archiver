@@ -162,6 +162,26 @@ if (useMask) {
   $('token').type = 'text';
   $('token').classList.add('masked');
 }
+// 伏せ字の欄から普通にコピーすると「●」がコピーされてしまうので、本物の文字列を渡す
+for (const type of ['copy', 'cut']) {
+  $('token').addEventListener(type, (e) => {
+    const el = e.target;
+    const selected = el.value.slice(el.selectionStart ?? 0, el.selectionEnd ?? el.value.length);
+    e.clipboardData.setData('text/plain', selected || el.value);
+    e.preventDefault();
+    if (type === 'cut') el.setRangeText('', el.selectionStart, el.selectionEnd, 'start');
+  });
+}
+$('copyToken').onclick = async () => {
+  const token = $('token').value.replace(/\s+/g, '');
+  if (!token) return msg('トークンが空です');
+  try {
+    await navigator.clipboard.writeText(token);
+    msg('トークンをコピーしました。別のブラウザの設定画面に貼り付けてください（チャットなどには貼らないでください）');
+  } catch (e) {
+    msg(`❌ コピーできませんでした: ${e.message}`);
+  }
+};
 $('toggleToken').onclick = () => {
   const el = $('token');
   const hidden = useMask ? el.classList.contains('masked') : el.type === 'password';
