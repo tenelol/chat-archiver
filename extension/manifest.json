@@ -1,14 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Chat Archiver",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "ChatGPT・Claude・Grok の会話履歴を Markdown にして GitHub リポジトリへ自動コミットします。",
   "permissions": [
     "storage",
     "unlimitedStorage",
     "alarms",
     "scripting",
-    "tabs"
+    "tabs",
+    "webRequest"
   ],
   "host_permissions": [
     "https://chatgpt.com/*",
@@ -23,30 +24,5 @@
   "action": {
     "default_title": "Chat Archiver の設定"
   },
-  "options_page": "options.html",
-  "content_scripts": [
-    {
-      "matches": [
-        "https://chatgpt.com/*",
-        "https://claude.ai/*",
-        "https://grok.com/*"
-      ],
-      "js": [
-        "content/hook.js"
-      ],
-      "world": "MAIN",
-      "run_at": "document_start"
-    },
-    {
-      "matches": [
-        "https://chatgpt.com/*",
-        "https://claude.ai/*",
-        "https://grok.com/*"
-      ],
-      "js": [
-        "content/bridge.js"
-      ],
-      "run_at": "document_start"
-    }
-  ]
+  "options_page": "options.html"
 }

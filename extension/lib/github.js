@@ -1,8 +1,24 @@
 // GitHub の Git Data API で、複数ファイルを1コミットにまとめて push する。
 
+// 通信断(Failed to fetch)はスリープ復帰直後などに起きやすいので、少し待ってやり直す
+async function fetchRetrying(url, init) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fetch(url, init);
+    } catch (e) {
+      if (attempt >= 2) {
+        const err = new Error(`GitHub に接続できません: ${e.message}`);
+        err.status = 0;
+        throw err;
+      }
+      await new Promise((r) => setTimeout(r, 5000 * 2 ** attempt));
+    }
+  }
+}
+
 function makeApi({ token, owner, repo }) {
   return async (path, opts = {}) => {
-    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}${path}`, {
+    const res = await fetchRetrying(`https://api.github.com/repos/${owner}/${repo}${path}`, {
       ...opts,
       // GitHub は ref などを Cache-Control: max-age=60 で返す。ブラウザの HTTP キャッシュが効くと
       // 60秒間古いブランチ先頭が返り、コミットが "not a fast forward" で失敗し続けるので使わない

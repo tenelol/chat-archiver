@@ -1,9 +1,10 @@
 import { SERVICES } from './lib/sources.js';
 import { buildPath, rawPath } from './lib/convert.js';
 import { commitFiles, testConnection } from './lib/github.js';
+import { detectTurn, idFromPageUrl } from './lib/detect.js';
 
 const ALARM = 'chat-archiver-sweep';
-const RESUME_ALARM = 'chat-archiver-resume'; // 429 で中断したとき、少し置いて自動で続きから再開する
+const RESUME_ALARM = 'chat-archiver-resume'; // 429 や通信断で中断したとき、少し置いて自動で続きから再開する
 const RESUME_AFTER_MIN = 10;
 const DEFAULTS = {
   token: '',
@@ -391,11 +392,11 @@ async function sweepAll(opts = {}) {
         await setProgress(service, '');
       }),
     );
-    const throttled = Object.values(summary).some((r) => r?.status === 429);
+    const throttled = Object.values(summary).some((r) => r?.status === 429 || r?.status === 0);
     if (throttled) chrome.alarms.create(RESUME_ALARM, { delayInMinutes: RESUME_AFTER_MIN });
     await setStatus({
       running: false,
-      progress: throttled ? `混雑のため中断。${RESUME_AFTER_MIN}分後に自動で再開します` : '',
+      progress: throttled ? `混雑か通信エラーのため中断。${RESUME_AFTER_MIN}分後に自動で再開します` : '',
       progressBy: {},
       lastSweepAt: Date.now(),
       lastSweep: summary,
@@ -456,11 +457,28 @@ chrome.storage.onChanged.addListener((changes) => {
   if (changes.config) setupAlarm();
 });
 
+// 返信の完了は、ページの fetch ではなく拡張側の webRequest で見張る。
+// ページ(や他の拡張)が window.fetch を差し替えても取りこぼさず、ページにスクリプトも入れない。
+chrome.webRequest.onCompleted.addListener(
+  (d) => {
+    if (d.method !== 'POST' || d.tabId < 0) return;
+    const hit = detectTurn(d.url);
+    if (!hit) return;
+    const run = async () => {
+      let id = hit.id;
+      if (!id) {
+        const tab = await chrome.tabs.get(d.tabId).catch(() => null);
+        id = idFromPageUrl(hit.service, tab?.url);
+      }
+      if (id) scheduleOne(hit.service, id, d.tabId);
+    };
+    setTimeout(run, 3000); // 返信の保存を待ってから
+    setTimeout(run, 25000); // 新規チャットのタイトル自動生成を拾う
+  },
+  { urls: ['https://chatgpt.com/*', 'https://claude.ai/*', 'https://grok.com/*'] },
+);
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg?.type === 'conversation-updated') {
-    scheduleOne(msg.service, msg.id, sender.tab?.id);
-    return false;
-  }
   if (msg?.type === 'sweep') {
     sweepAll({ full: !!msg.full }).then(sendResponse, (e) => sendResponse({ error: e.message }));
     return true;

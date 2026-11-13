@@ -81,13 +81,18 @@ assert.ok(gk.markdown.includes('<summary>参照 1件</summary>') && gk.markdown.
 assert.ok(gk.markdown.includes('model: "grok-3"') && gk.markdown.includes('url: "https://grok.com/c/aaaaaaaa-0000-4000-8000-000000000000"'));
 assert.equal(buildPath('chat-history', 'grok', gk.created, gk.title, 'aaaaaaaa-0000'), 'chat-history/2026/11/2026-11-10_1124_grok_旅行の持ち物_aaaaaaaa.md');
 
-/* ---- 返信完了の検知に使う URL(hook.js と同じ正規表現) ---- */
-const hookSrc = (await import('node:fs')).readFileSync(new URL('../extension/content/hook.js', import.meta.url), 'utf8');
-const GROK_RE = new RegExp(hookSrc.match(/const GROK_RE = \/(.+)\/;/)[1]);
-assert.equal('https://grok.com/rest/app-chat/conversations/new'.match(GROK_RE)?.[1], undefined);
-assert.ok(GROK_RE.test('https://grok.com/rest/app-chat/conversations/new'));
-assert.equal('https://grok.com/rest/app-chat/conversations/138462d3-8e43-4f8d-a1d7-3079605b1124/responses'.match(GROK_RE)[1], '138462d3-8e43-4f8d-a1d7-3079605b1124');
-assert.ok(!GROK_RE.test('https://grok.com/rest/app-chat/conversations/138462d3-8e43-4f8d-a1d7-3079605b1124/load-responses'), '読み込みは対象外');
+/* ---- 返信完了の検知(webRequest で見る URL)と、ページ URL からの会話 ID ---- */
+const { detectTurn, idFromPageUrl } = await import('../extension/lib/detect.js');
+assert.deepEqual(detectTurn('https://chatgpt.com/backend-api/f/conversation'), { service: 'chatgpt', id: null });
+assert.deepEqual(detectTurn('https://chatgpt.com/backend-api/f/conversation/resume'), { service: 'chatgpt', id: null });
+assert.equal(detectTurn('https://chatgpt.com/backend-api/conversation/abc'), null, '会話の読み込みは対象外');
+assert.deepEqual(detectTurn('https://claude.ai/api/organizations/o-1/chat_conversations/11111111-2222-3333-4444-555555555555/completion'), { service: 'claude', id: '11111111-2222-3333-4444-555555555555' });
+assert.deepEqual(detectTurn('https://grok.com/rest/app-chat/conversations/new'), { service: 'grok', id: null });
+assert.deepEqual(detectTurn('https://grok.com/rest/app-chat/conversations/138462d3-8e43-4f8d-a1d7-3079605b1124/responses'), { service: 'grok', id: '138462d3-8e43-4f8d-a1d7-3079605b1124' });
+assert.equal(detectTurn('https://grok.com/rest/app-chat/conversations/138462d3-8e43-4f8d-a1d7-3079605b1124/load-responses'), null);
+assert.equal(idFromPageUrl('chatgpt', 'https://chatgpt.com/g/g-p-abc/c/6af65375-0000-8000-9000-000000000000'), '6af65375-0000-8000-9000-000000000000');
+assert.equal(idFromPageUrl('claude', 'https://claude.ai/chat/11111111-2222-3333-4444-555555555555'), '11111111-2222-3333-4444-555555555555');
+assert.equal(idFromPageUrl('grok', 'https://grok.com/'), null);
 
 /* ---- パス ---- */
 const p = buildPath('', 'claude', c.created, c.title, cl.uuid);

@@ -34,7 +34,7 @@ ChatGPT・Claude・Grok の会話履歴を Markdown にして、自分の GitHub
 
 ```
 chatgpt.com / claude.ai / grok.com のタブ
-  └ content/hook.js が返信ストリームの終わりを検知（会話の中身は読まない）
+  └ 返信を生成する通信が終わったことを、拡張側（webRequest）で検知（ページには何も入れない）
       └ background.js がその会話を取得 → Markdown 化 → GitHub API で1コミット
 定期巡回（alarms）
   └ 会話一覧を更新順に読み、前回から変わった会話だけコミット
@@ -152,7 +152,7 @@ chatgpt.com・claude.ai・grok.com を開いてログインした状態で **今
 | `GitHub 401` | トークンの期限切れ。再発行して貼り直す |
 | `GitHub 403/404` | トークンの対象リポジトリと Contents 権限を確認 |
 | `API 403`（ChatGPT） | chatgpt.com のタブを開いたままにしておく |
-| 「混雑のため中断」 | 何もしなくてよい（10分後に自動で再開） |
+| 「混雑か通信エラーのため中断」 | 何もしなくてよい（10分後に自動で再開） |
 | 拡張を更新したのに変わらない | 拡張の管理画面で再読み込みし、開いているサイトのタブも再読み込み |
 
 ---
@@ -166,8 +166,7 @@ extension/
   lib/sources.js       ChatGPT / claude.ai / Grok の API アダプタ（仕様変更時はここ）
   lib/convert.js       会話データ → Markdown（仕様変更時はここ）
   lib/github.js        GitHub Git Data API（複数ファイルを1コミット）
-  content/hook.js      返信完了の検知（ページ側の fetch を包む）
-  content/bridge.js    検知を background に中継
+  lib/detect.js        返信完了の検知に使う URL の判定
   options.html/.js     設定画面
 scripts/build.sh       dist/ に Chrome 版・Firefox 版と zip を作る
 test/run.mjs           変換・コミット処理のテスト
