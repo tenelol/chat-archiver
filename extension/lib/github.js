@@ -17,6 +17,12 @@ async function fetchRetrying(url, init) {
 }
 
 function makeApi({ token, owner, repo }) {
+  // 英数字と _ 以外(伏せ字の ● など)が入ったトークンは、fetch がヘッダーを作れずに失敗するので先に止める
+  if (!/^[A-Za-z0-9_]+$/.test(token || '')) {
+    const err = new Error('トークンに使えない文字が入っています。設定画面で GitHub のトークンを貼り直してください');
+    err.status = 401;
+    throw err;
+  }
   return async (path, opts = {}) => {
     const res = await fetchRetrying(`https://api.github.com/repos/${owner}/${repo}${path}`, {
       ...opts,

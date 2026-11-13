@@ -23,7 +23,22 @@ function read() {
     const el = $(f);
     c[f] = el.type === 'checkbox' ? el.checked : el.type === 'number' ? Number(el.value) : el.value.trim();
   }
+  c.token = c.token.replace(/\s+/g, ''); // 貼り付けで紛れ込んだ空白・改行は取り除く
   return c;
+}
+
+// GitHub のトークンは英数字と _ だけでできている。伏せ字の「●」などが入っていたら、
+// コピーしたのが本物のトークンではない(伏せ字の見た目をコピーした)ので、送る前に止める
+function tokenProblem(token) {
+  if (!token) return 'トークンが空です';
+  if (/^[A-Za-z0-9_]+$/.test(token)) return null;
+  return 'トークンに使えない文字（● など）が入っています。伏せ字の見た目ではなく、GitHub で表示された github_pat_… をコピーして貼り直してください';
+}
+function readChecked() {
+  const c = read();
+  const problem = tokenProblem(c.token);
+  if (problem) msg(`❌ ${problem}`);
+  return problem ? null : c;
 }
 
 const fmt = (t) => (t ? new Date(t).toLocaleString('ja-JP') : '-');
@@ -89,6 +104,7 @@ $('pasteToken').onclick = async () => {
     const text = (await readClipboard()).trim();
     if (!text) return msg('クリップボードが空です');
     $('token').value = text;
+    if (tokenProblem(text)) return msg(`❌ ${tokenProblem(text)}`);
     msg(/^(github_pat_|ghp_)/.test(text) ? 'トークンを貼り付けました。「保存」を押してください' : '⚠️ トークンらしくない文字列です。コピーした内容を確認してください');
   } catch (e) {
     msg(`❌ 貼り付けできませんでした: ${e.message}`);
@@ -96,12 +112,16 @@ $('pasteToken').onclick = async () => {
 };
 
 $('save').onclick = async () => {
-  await chrome.storage.local.set({ config: read() });
+  const c = readChecked();
+  if (!c) return;
+  await chrome.storage.local.set({ config: c });
   msg('保存しました');
 };
 
 $('test').onclick = async () => {
-  await chrome.storage.local.set({ config: read() });
+  const c = readChecked();
+  if (!c) return;
+  await chrome.storage.local.set({ config: c });
   msg('確認中…');
   const r = await chrome.runtime.sendMessage({ type: 'test' });
   if (r?.error) msg(`❌ ${r.error}`);
@@ -109,7 +129,9 @@ $('test').onclick = async () => {
 };
 
 async function sweep(full) {
-  await chrome.storage.local.set({ config: read() });
+  const c = readChecked();
+  if (!c) return;
+  await chrome.storage.local.set({ config: c });
   msg('同期中…（初回は会話数によって数分〜数十分かかります。このページは閉じてもOK）');
   const r = await chrome.runtime.sendMessage({ type: 'sweep', full });
   if (r?.error) return msg(`❌ ${r.error}`);
