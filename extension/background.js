@@ -237,7 +237,9 @@ async function processConversations(service, fetchJson, ctx, items, cfg, { progr
   const flush = async () => {
     if (batch.length) {
       const msg = commitMessage(service, titles);
-      const res = await commitLock(() => commitFiles(cfg, batch, msg));
+      // 巡回の途中で設定画面からトークンを貼り直しても効くよう、コミットのたびに最新のトークンを読む
+      const { token } = await getConfig();
+      const res = await commitLock(() => commitFiles({ ...cfg, token }, batch, msg));
       if (!res.skipped) {
         committed += titles.length;
         await setStatus({ lastCommitAt: Date.now(), lastCommitMsg: msg.split('\n')[0] });
@@ -449,6 +451,13 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   if (reason === 'install') chrome.runtime.openOptionsPage();
 });
 chrome.runtime.onStartup.addListener(setupAlarm);
+// Service Worker が止まると実行中の巡回も消えるので、起動時に「実行中」のまま残った表示を戻す
+storageLock(async () => {
+  const { status = {} } = await chrome.storage.local.get('status');
+  if (status.running) {
+    await chrome.storage.local.set({ status: { ...status, running: false, progress: '', progressBy: {} } });
+  }
+});
 chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === ALARM || a.name === RESUME_ALARM) sweepAll();
 });
