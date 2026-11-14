@@ -173,6 +173,45 @@ async function with429Retry(service, once) {
 }
 
 // そのサービスのタブが開いていればタブ内から(Cookie/Cloudflare対策で確実)、なければ拡張から直接取得
+// ChatGPT はタブがないと拡張からの直接取得を 403 で弾くことがある。そのときだけ裏でサイトのタブを開いて使い、
+// 巡回が終わったら閉じる。Service Worker が途中で止まって閉じ損ねた分は、次の起動時に閉じる(storage.session)
+function waitForTabLoad(tabId, ms = 30000) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      err ? reject(err) : resolve();
+    };
+    const onUpdated = (id, info) => id === tabId && info.status === 'complete' && done();
+    const timer = setTimeout(() => done(new Error('裏で開いたタブの読み込みが終わりませんでした')), ms);
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.get(tabId).then((t) => t.status === 'complete' && done(), () => done(new Error('裏で開いたタブが閉じられました')));
+  });
+}
+async function rememberOwnTab(tabId, add) {
+  const { ownTabs = [] } = await chrome.storage.session.get('ownTabs');
+  const next = add ? [...ownTabs, tabId] : ownTabs.filter((id) => id !== tabId);
+  await chrome.storage.session.set({ ownTabs: next });
+}
+async function openBackgroundTab(service) {
+  const tab = await chrome.tabs.create({ url: service.tabPattern.replace(/\*$/, ''), active: false });
+  await rememberOwnTab(tab.id, true);
+  try {
+    await waitForTabLoad(tab.id);
+  } catch (e) {
+    await closeOwnTab(tab.id);
+    throw e;
+  }
+  return tab.id;
+}
+async function closeOwnTab(tabId) {
+  await chrome.tabs.remove(tabId).catch(() => {});
+  await rememberOwnTab(tabId, false);
+}
+
 async function makeFetcher(service, preferredTabId) {
   let tabId = preferredTabId ?? null;
   if (tabId == null) {
@@ -196,7 +235,6 @@ async function makeFetcher(service, preferredTabId) {
     }
     return res.json();
   };
-  if (tabId == null) return (url, headers = {}, body) => with429Retry(service, () => direct(url, headers, body));
   const viaTab = async (url, headers = {}, body) => {
     let r;
     try {
@@ -214,7 +252,26 @@ async function makeFetcher(service, preferredTabId) {
     if (!r?.ok) throw httpError(service, url, r || { status: 0 });
     return r.json;
   };
-  return (url, headers = {}, body) => with429Retry(service, () => viaTab(url, headers, body));
+  let opening = null; // 並行して 403 が返ってもタブは1つだけ開く
+  const once = async (url, headers, body) => {
+    if (tabId != null) return viaTab(url, headers, body);
+    try {
+      return await direct(url, headers, body);
+    } catch (e) {
+      if (e.status !== 403) throw e;
+      opening ??= openBackgroundTab(service);
+      tabId = await opening.catch(() => {
+        throw e; // タブを開けなければ元の 403 を返す
+      });
+      return viaTab(url, headers, body);
+    }
+  };
+  const fetchJson = (url, headers = {}, body) => with429Retry(service, () => once(url, headers, body));
+  fetchJson.close = async () => {
+    const id = await opening?.catch(() => null);
+    if (id != null) await closeOwnTab(id);
+  };
+  return fetchJson;
 }
 
 /* ---------- 会話の取得→Markdown化→コミット ---------- */
@@ -335,9 +392,17 @@ async function processConversations(service, fetchJson, ctx, items, cfg, { progr
   return { committed, errors: errors.length };
 }
 
-async function sweepService(service, cfg, { full = false } = {}) {
-  await setProgress(service, `${service.label}: 一覧を取得中`);
+async function sweepService(service, cfg, opts) {
   const fetchJson = await makeFetcher(service);
+  try {
+    return await sweepWith(service, fetchJson, cfg, opts);
+  } finally {
+    await fetchJson.close(); // 裏で開いたタブがあれば閉じる
+  }
+}
+
+async function sweepWith(service, fetchJson, cfg, { full = false } = {}) {
+  await setProgress(service, `${service.label}: 一覧を取得中`);
   const ctx = await service.auth(fetchJson);
   const { convs, backfill } = await getState();
   const doneBackfill = backfill[service.name] === true;
@@ -431,8 +496,12 @@ async function syncOne(serviceName, id, tabId) {
   if (!enabledServices(cfg).includes(service)) return;
   return exclusive(async () => {
     const fetchJson = await makeFetcher(service, tabId);
-    const ctx = await service.auth(fetchJson);
-    return processConversations(service, fetchJson, ctx, [{ id }], cfg);
+    try {
+      const ctx = await service.auth(fetchJson);
+      return await processConversations(service, fetchJson, ctx, [{ id }], cfg);
+    } finally {
+      await fetchJson.close();
+    }
   });
 }
 
@@ -451,6 +520,8 @@ chrome.runtime.onInstalled.addListener(async ({ reason }) => {
   if (reason === 'install') chrome.runtime.openOptionsPage();
 });
 chrome.runtime.onStartup.addListener(setupAlarm);
+// 前の Service Worker が閉じ損ねた、裏で開いたタブを閉じる
+chrome.storage.session.get('ownTabs').then(({ ownTabs = [] }) => ownTabs.forEach(closeOwnTab));
 // Service Worker が止まると実行中の巡回も消えるので、起動時に「実行中」のまま残った表示を戻す
 storageLock(async () => {
   const { status = {} } = await chrome.storage.local.get('status');
